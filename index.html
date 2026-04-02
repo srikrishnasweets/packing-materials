@@ -149,6 +149,7 @@
             flex-shrink: 0;
             text-align: center;
             transition: transform 0.16s ease;
+            cursor: pointer;
         }
 
         .product:hover {
@@ -175,6 +176,19 @@
             bottom: 4px;
             right: 4px;
             background: #dc2626;
+            color: white;
+            font-size: 11px;
+            padding: 3px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .sale-badge {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            background: #16a34a;
             color: white;
             font-size: 11px;
             padding: 3px 6px;
@@ -239,6 +253,110 @@
             flex-wrap: wrap;
         }
 
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 16px;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .product-modal {
+            width: min(760px, 100%);
+            background: #ffffff;
+            border-radius: 14px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+            padding: 16px;
+        }
+
+        .product-modal-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .product-modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .product-modal-close {
+            border: none;
+            background: #e2e8f0;
+            color: #0f172a;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .product-modal-body {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 16px;
+        }
+
+        .product-modal-image img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+        }
+
+        .product-modal-info {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .info-item {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+
+        .info-label {
+            font-size: 11px;
+            color: #475569;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 13px;
+            color: #0f172a;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        @media (max-width: 720px) {
+            .product-modal-body {
+                grid-template-columns: 1fr;
+            }
+
+            .product-modal-image img {
+                height: 180px;
+            }
+
+            .product-modal-info {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .rack-title-row::-webkit-scrollbar,
         .products-grid::-webkit-scrollbar {
             height: 8px;
@@ -274,6 +392,21 @@
         </div>
     </main>
 
+    <div id="productModalOverlay" class="modal-overlay">
+        <div class="product-modal">
+            <div class="product-modal-top">
+                <div id="productModalTitle" class="product-modal-title">Product Details</div>
+                <button id="productModalClose" class="product-modal-close" type="button">Close</button>
+            </div>
+            <div class="product-modal-body">
+                <div class="product-modal-image">
+                    <img id="productModalImage" src="" alt="Packing Material">
+                </div>
+                <div id="productModalInfo" class="product-modal-info"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
 
         const API = "https://script.google.com/macros/s/AKfycbzTI1gyN1_nTihFkd-efQmmz_2GSYLILjP8IhNKH1C13RmUmzht5ENDWTjV3JCjoTud/exec";
@@ -301,6 +434,78 @@
     <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
     font-size="10" font-family="Inter" fill="#475569">${text}</text></svg>`;
             return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+        }
+
+        function safeText(value) {
+            if (value === undefined || value === null || value === "") return "-";
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function initModalHandlers() {
+            const overlay = document.getElementById("productModalOverlay");
+            const closeBtn = document.getElementById("productModalClose");
+            if (!overlay || !closeBtn) return;
+
+            closeBtn.addEventListener("click", closeProductModal);
+            overlay.addEventListener("click", (e) => {
+                if (e.target === overlay) closeProductModal();
+            });
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" && overlay.classList.contains("show")) {
+                    closeProductModal();
+                }
+            });
+        }
+
+        function closeProductModal() {
+            const overlay = document.getElementById("productModalOverlay");
+            if (overlay) overlay.classList.remove("show");
+        }
+
+        function openProductModal(product) {
+            const overlay = document.getElementById("productModalOverlay");
+            const title = document.getElementById("productModalTitle");
+            const imageEl = document.getElementById("productModalImage");
+            const info = document.getElementById("productModalInfo");
+            if (!overlay || !title || !imageEl || !info) return;
+
+            const image = product.Img && product.Img !== "#N/A"
+                ? img(product.Img)
+                : placeholder(product.Product);
+
+            title.textContent = product.Product || "Product Details";
+            imageEl.src = image;
+            imageEl.onerror = () => {
+                imageEl.onerror = null;
+                imageEl.src = placeholder(product.Product);
+            };
+
+            const details = [
+                { label: "Packing Material", value: product.Product },
+                { label: "Product", value: product["SKS Product"] },
+                { label: "Code", value: product.Code },
+                { label: "Category", value: product.Category },
+                { label: "Sub Category", value: product.Sub },
+                { label: "Type", value: product.Type },
+                { label: "Gramage", value: product.Gramage },
+                { label: "Current Stock", value: product["Current Stock"] },
+                { label: "Last Month Sale", value: product["Last Month Sale"] }
+            ];
+
+            info.innerHTML = details.map(item => `
+                <div class="info-item">
+                    <div class="info-label">${safeText(item.label)}</div>
+                    <div class="info-value">${safeText(item.value)}</div>
+                </div>
+            `).join("");
+
+            overlay.classList.add("show");
         }
 
         // LOAD
@@ -426,14 +631,6 @@
                         section.appendChild(title);
 
                         const subItems = subs[sub];
-                        const subInfo = subItems[0] || {};
-                        const bpValue = subInfo.Bp || "-";
-                        const lastMonthSaleValue = subInfo["Last Month Sale"] ?? "-";
-
-                        const meta = document.createElement("div");
-                        meta.className = "subcategory-meta";
-                        meta.innerHTML = `<span>BP: ${bpValue}</span><span>Last Month Sales: ${lastMonthSaleValue}</span>`;
-                        section.appendChild(meta);
 
                         const grid = document.createElement("div");
                         grid.className = "products-grid";
@@ -448,12 +645,15 @@
 
                                 const div = document.createElement("div");
                                 div.className = "product";
+                                div.title = "Click to view details";
+                                div.addEventListener("click", () => openProductModal(p));
 
                                 div.innerHTML = `
                             <div class="image-container">
                                 <img src="${image}"
                                 onerror="this.onerror=null; this.src='${placeholder(p.Product)}'">
                                 <div class="gramage-badge">${p.Gramage || ""}</div>
+                                <div class="sale-badge">${p["Last Month Sale"] ?? 0}</div>
                                 <div class="badge">${p["Current Stock"] || 0}</div>
                             </div>
                             <div class="product-name">${p.Product}</div>
@@ -476,6 +676,7 @@
         }
 
         // INIT
+        initModalHandlers();
         load();
         setInterval(load, 10 * 60 * 1000);
 
