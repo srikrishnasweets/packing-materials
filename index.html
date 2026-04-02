@@ -185,7 +185,7 @@
 
         .gramage-badge {
             position: absolute;
-            bottom: 4px;
+            top: 4px;
             left: 4px;
             background: #0ea5e9;
             color: white;
@@ -202,6 +202,13 @@
             margin-top: 5px;
             color: #1f2937;
             font-weight: 600;
+        }
+
+        .product-type {
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #1d4ed8;
         }
 
         .subcategory-section {
@@ -244,6 +251,10 @@
             <select id="subcategoryFilter" class="sub-filter">
                 <option value="__all__">All</option>
             </select>
+            <label for="typeFilter">Type</label>
+            <select id="typeFilter" class="sub-filter">
+                <option value="__all__">All</option>
+            </select>
         </div>
     </header>
 
@@ -259,6 +270,7 @@
 
         let fullData = [];
         let selectedSubCategory = "__all__";
+        let selectedType = "__all__";
 
         // DRIVE IMAGE FIX
         function img(link) {
@@ -289,6 +301,7 @@
 
                 fullData = data;
                 bindSubCategoryFilter();
+                bindTypeFilter();
                 render();
             } catch (e) {
                 console.error("API Error", e);
@@ -322,15 +335,34 @@
             };
         }
 
+        function bindTypeFilter() {
+            const typeFilter = document.getElementById("typeFilter");
+            if (!typeFilter) return;
+
+            const typeList = getUniqueValuesByField(fullData, "Type");
+            selectedType = fillSelect(typeFilter, typeList, selectedType);
+            typeFilter.onchange = (e) => {
+                selectedType = e.target.value;
+                render();
+            };
+        }
+
         // MAIN RENDER
         function render() {
             const container = document.getElementById("container");
             container.innerHTML = "";
 
             const categories = {};
+            const filteredData = fullData.filter(item => {
+                const sub = item.Sub || "Others";
+                const type = item.Type || "Others";
+                const matchSubCategory = selectedSubCategory === "__all__" || sub === selectedSubCategory;
+                const matchType = selectedType === "__all__" || type === selectedType;
+                return matchSubCategory && matchType;
+            });
 
             // BUILD TREE → Category → Sub → Products
-            fullData.forEach(item => {
+            filteredData.forEach(item => {
                 const cat = item.Category || "Others";
                 const sub = item.Sub || "Others";
 
@@ -405,6 +437,7 @@
                                 <div class="badge">${p["Current Stock"] || 0}</div>
                             </div>
                             <div class="product-name">${p.Product}</div>
+                            <div class="product-type">${p.Type || "Others"}</div>
                         `;
 
                                 grid.appendChild(div);
@@ -418,12 +451,13 @@
             });
 
             if (!Object.keys(categories).length) {
-                container.innerHTML = `<div style="padding: 24px; text-align: center; color: #475569; font-weight: 600;">No products found for selected sub category.</div>`;
+                container.innerHTML = `<div style="padding: 24px; text-align: center; color: #475569; font-weight: 600;">No products found for selected filters.</div>`;
             }
         }
 
         // INIT
         load();
+        setInterval(load, 10 * 60 * 1000);
 
     </script>
 
