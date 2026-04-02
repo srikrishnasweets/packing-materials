@@ -229,6 +229,16 @@
             width: fit-content;
         }
 
+        .subcategory-meta {
+            margin: 0 0 8px 10px;
+            font-size: 12px;
+            color: #334155;
+            font-weight: 600;
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
         .rack-title-row::-webkit-scrollbar,
         .products-grid::-webkit-scrollbar {
             height: 8px;
@@ -415,10 +425,20 @@
 
                         section.appendChild(title);
 
+                        const subItems = subs[sub];
+                        const subInfo = subItems[0] || {};
+                        const bpValue = subInfo.Bp || "-";
+                        const lastMonthSaleValue = subInfo["Last Month Sale"] ?? "-";
+
+                        const meta = document.createElement("div");
+                        meta.className = "subcategory-meta";
+                        meta.innerHTML = `<span>BP: ${bpValue}</span><span>Last Month Sales: ${lastMonthSaleValue}</span>`;
+                        section.appendChild(meta);
+
                         const grid = document.createElement("div");
                         grid.className = "products-grid";
 
-                        subs[sub]
+                        subItems
                             .sort((a, b) => a.Product.localeCompare(b.Product))
                             .forEach(p => {
 
