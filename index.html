@@ -16,16 +16,68 @@
         }
 
         header.appbar {
-            padding: 16px 20px;
+            padding: 14px 20px;
             background: linear-gradient(90deg, #1d4ed8 0%, #2563eb 40%, #0ea5e9 100%);
             color: #ffffff;
             box-shadow: 0 6px 24px rgba(37, 99, 235, 0.25);
             font-weight: 700;
             letter-spacing: 0.3px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .appbar-title {
+            font-size: 18px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .filter-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .sub-filter {
+            min-width: 220px;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 8px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+            font-weight: 600;
+            outline: none;
+        }
+
+        .sub-filter option {
+            color: #0f172a;
+            background: #ffffff;
         }
 
         .page {
             padding: 20px;
+        }
+
+        @media (max-width: 900px) {
+            header.appbar {
+                align-items: stretch;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .filter-wrap {
+                width: 100%;
+            }
+
+            .sub-filter {
+                min-width: 0;
+                width: 100%;
+            }
         }
 
         .main-card {
@@ -185,7 +237,15 @@
 
 <body>
 
-    <header class="appbar">PACKING MATERIALS</header>
+    <header class="appbar">
+        <div class="appbar-title">PACKING MATERIALS</div>
+        <div class="filter-wrap">
+            <label for="subcategoryFilter">Sub Category</label>
+            <select id="subcategoryFilter" class="sub-filter">
+                <option value="__all__">All</option>
+            </select>
+        </div>
+    </header>
 
     <main class="page">
         <div class="main-card">
@@ -198,6 +258,7 @@
         const API = "https://script.google.com/macros/s/AKfycbzTI1gyN1_nTihFkd-efQmmz_2GSYLILjP8IhNKH1C13RmUmzht5ENDWTjV3JCjoTud/exec";
 
         let fullData = [];
+        let selectedSubCategory = "__all__";
 
         // DRIVE IMAGE FIX
         function img(link) {
@@ -227,10 +288,38 @@
                 const data = await res.json();
 
                 fullData = data;
+                bindSubCategoryFilter();
                 render();
             } catch (e) {
                 console.error("API Error", e);
             }
+        }
+
+        function getUniqueValuesByField(data, fieldName, fallback = "Others") {
+            return Array.from(new Set(
+                data.map(item => item[fieldName] || fallback)
+            )).sort((a, b) => a.localeCompare(b));
+        }
+
+        function fillSelect(selectEl, values, selectedValue) {
+            selectEl.innerHTML = `<option value="__all__">All</option>` +
+                values.map(value => `<option value="${value}">${value}</option>`).join("");
+
+            const nextValue = values.includes(selectedValue) ? selectedValue : "__all__";
+            selectEl.value = nextValue;
+            return nextValue;
+        }
+
+        function bindSubCategoryFilter() {
+            const subCategoryFilter = document.getElementById("subcategoryFilter");
+            if (!subCategoryFilter) return;
+
+            const subCategoryList = getUniqueValuesByField(fullData, "Sub");
+            selectedSubCategory = fillSelect(subCategoryFilter, subCategoryList, selectedSubCategory);
+            subCategoryFilter.onchange = (e) => {
+                selectedSubCategory = e.target.value;
+                render();
+            };
         }
 
         // MAIN RENDER
@@ -246,15 +335,26 @@
                 const sub = item.Sub || "Others";
 
                 if (!categories[cat]) categories[cat] = {};
+
                 if (!categories[cat][sub]) categories[cat][sub] = [];
 
                 categories[cat][sub].push(item);
             });
 
             // RENDER
-            Object.keys(categories).forEach(category => {
+            const categoryKeys = Object.keys(categories).sort((a, b) => {
+                if (selectedSubCategory === "__all__") return a.localeCompare(b);
+                const aHas = Object.prototype.hasOwnProperty.call(categories[a], selectedSubCategory);
+                const bHas = Object.prototype.hasOwnProperty.call(categories[b], selectedSubCategory);
+                if (aHas && !bHas) return -1;
+                if (!aHas && bHas) return 1;
+                return a.localeCompare(b);
+            });
+
+            categoryKeys.forEach(category => {
                 const card = document.createElement("div");
                 card.className = "rack-type-card";
+                card.dataset.category = category;
 
                 const header = document.createElement("div");
                 header.className = "rack-type-header";
@@ -265,7 +365,13 @@
                 const subs = categories[category];
 
                 Object.keys(subs)
-                    .sort((a, b) => a.localeCompare(b))
+                    .sort((a, b) => {
+                        if (selectedSubCategory !== "__all__") {
+                            if (a === selectedSubCategory && b !== selectedSubCategory) return -1;
+                            if (a !== selectedSubCategory && b === selectedSubCategory) return 1;
+                        }
+                        return a.localeCompare(b);
+                    })
                     .forEach(sub => {
 
                         const section = document.createElement("div");
@@ -310,6 +416,10 @@
 
                 container.appendChild(card);
             });
+
+            if (!Object.keys(categories).length) {
+                container.innerHTML = `<div style="padding: 24px; text-align: center; color: #475569; font-weight: 600;">No products found for selected sub category.</div>`;
+            }
         }
 
         // INIT
